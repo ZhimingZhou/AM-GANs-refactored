@@ -257,8 +257,10 @@ sTestCaseDir = cfg.sResultDir + sTestName + '/'
 sSampleDir = sTestCaseDir + '/samples/'
 sCheckpointDir = sTestCaseDir + '/checkpoint/'
 
-makedirs(sCheckpointDir)
+makedirs(cfg.sResultDir)
+makedirs(sTestCaseDir)
 makedirs(sSampleDir)
+makedirs(sCheckpointDir)
 makedirs(sTestCaseDir + '/code/')
 
 logger = Logger()
