@@ -56,14 +56,18 @@ def identity(inputs):
 
 
 def cond_norm(axes, inputs, labels=None, n_labels=None, name=None):
+
     mean, var = tf.nn.moments(inputs, axes, keep_dims=True)
     n_neurons = inputs.get_shape().as_list()[list((set(range(len(inputs.get_shape()))) - set(axes)))[0]]
 
     if labels == None:
+
         offset = tf.get_variable(name + '.offset', initializer=np.zeros(mean.get_shape().as_list(), dtype='float32'))
         scale = tf.get_variable(name + '.scale', initializer=np.ones(var.get_shape().as_list(), dtype='float32'))
         result = tf.nn.batch_normalization(inputs, mean, var, offset, scale, 1e-5)
+
     else:
+
         offset_m = tf.get_variable(name + '.offset', initializer=np.zeros([n_labels, n_neurons], dtype='float32'))
         scale_m = tf.get_variable(name + '.scale', initializer=np.ones([n_labels, n_neurons], dtype='float32'))
         offset = tf.nn.embedding_lookup(offset_m, labels)
@@ -74,6 +78,7 @@ def cond_norm(axes, inputs, labels=None, n_labels=None, name=None):
 
 
 def batch_norm(input, bOffset=True, bScale=True, epsilon=0.001, name='batchnorm'):
+
     assert not __enable_sn__
 
     with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
@@ -112,12 +117,13 @@ def batch_norm(input, bOffset=True, bScale=True, epsilon=0.001, name='batchnorm'
             batch_mean, batch_variance = tf.nn.moments(input, axis)
             outputs = tf.nn.batch_normalization(input, batch_mean, batch_variance, offset, scale, epsilon)
 
-    # Note: here for fast training we did not do the moving average (for testing). which we usually not use.
+    # Note: here we did not do the moving average (for testing). which we usually not use.
 
     return outputs
 
 
 def deconv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, name='deconv2d'):
+
     def get_deconv_dim(spatial_size, stride_size, kernel_size, padding):
         spatial_size *= stride_size
         if padding == 'VALID':
@@ -136,9 +142,7 @@ def deconv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, 
 
     with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
 
-        w = tf.get_variable('w', [ksize, ksize, output_dim, input_shape[c_axis]], initializer=tf.truncated_normal_initializer()) #NormaliedOrthogonalInitializer())
-        s = tf.get_variable('s', initializer=tf.sqrt(tf.constant(1.0/(ksize*ksize*input_shape[c_axis])))*stride)
-        w = w * s
+        w = tf.get_variable('w', [ksize, ksize, output_dim, input_shape[c_axis]], initializer=variance_scaling_initializer(factor=__ini_scale__, mode="FAN_OUT", uniform=False))
 
         if __enable_wn__:
             g = tf.get_variable('g', initializer=tf.sqrt(tf.reduce_sum(tf.square(w), [0, 1, 3], keep_dims=True)))
@@ -154,6 +158,7 @@ def deconv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, 
             x = tf.nn.bias_add(x, b, data_format=__data_format__)
 
     if __debug_first_n__:
+
         axis = [0, h_axis, w_axis]
 
         mean, var = tf.nn.moments(input, axes=axis)
@@ -168,6 +173,7 @@ def deconv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, 
 
 
 def conv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, name='conv2d'):
+
     with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
 
         input_shape = input.get_shape().as_list()
@@ -191,6 +197,7 @@ def conv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, na
             x = tf.nn.bias_add(x, b, data_format=__data_format__)
 
     if __debug_first_n__:
+
         axis = [0, h_axis, w_axis]
 
         mean, var = tf.nn.moments(input, axes=axis)
@@ -205,6 +212,7 @@ def conv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, na
 
 
 def linear(input, output_size, bBias=False, name='linear'):
+
     with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
 
         if len(input.get_shape().as_list()) > 2:
@@ -227,6 +235,7 @@ def linear(input, output_size, bBias=False, name='linear'):
             x = tf.nn.bias_add(x, b)
 
     if __debug_first_n__:
+
         mean, var = tf.nn.moments(input, axes=[0])
         x = tf.Print(x, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' before', first_n=__debug_first_n__)
 
@@ -237,7 +246,9 @@ def linear(input, output_size, bBias=False, name='linear'):
 
 
 def avgpool(input, ksize, stride, name='avgpool'):
+
     with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
+
         kernel = [1, ksize, ksize, 1] if __data_format__ == "NHWC" else [1, 1, ksize, ksize]
         strides = [1, stride, stride, 1] if __data_format__ == "NHWC" else [1, 1, stride, stride]
 
@@ -247,7 +258,9 @@ def avgpool(input, ksize, stride, name='avgpool'):
 
 
 def maxpool(input, ksize, stride, name='maxpool'):
+
     with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
+
         kernel = [1, ksize, ksize, 1] if __data_format__ == "NHWC" else [1, 1, ksize, ksize]
         strides = [1, stride, stride, 1] if __data_format__ == "NHWC" else [1, 1, stride, stride]
 
@@ -257,6 +270,7 @@ def maxpool(input, ksize, stride, name='maxpool'):
 
 
 def noise(input, stddev, bAdd=False, bMulti=True, keep_prob=None, name='noise'):
+
     with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
 
         if bAdd:
@@ -271,7 +285,9 @@ def noise(input, stddev, bAdd=False, bMulti=True, keep_prob=None, name='noise'):
 
 
 def dropout(input, drop_prob, name='dropout'):
+
     if __debug_first_n__:
+
         mean, var = tf.nn.moments(input, axes=[0, 2, 3])
         input = tf.Print(input, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' before', first_n=__debug_first_n__)
 
@@ -288,28 +304,15 @@ def dropout(input, drop_prob, name='dropout'):
         # input = tf.nn.dropout(input, 1.0 - drop_prob, name=name) * (1.0 - drop_prob)
 
     if __debug_first_n__:
+
         mean, var = tf.nn.moments(input, axes=[0, 2, 3])
         input = tf.Print(input, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' after', first_n=__debug_first_n__)
 
     return input
 
 
-def elu(x, alpha=1.):
-    res = tf.nn.elu(x)
-    if alpha == 1:
-        return res
-    else:
-        return tf.where(x > 0, res, alpha * res)
-
-
-def lrelu(x, leak=0.2, name="lrelu"):
-    with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
-        x = tf.maximum(x, leak * x)
-
-    return x
-
-
 def activate(input, oAct, oBn):
+
     with tf.variable_scope(oBn):
 
         if oBn == 'bn':
@@ -328,7 +331,7 @@ def activate(input, oAct, oBn):
             input = tf.nn.relu(input)
 
         elif oAct == 'lrelu':
-            input = lrelu(input)
+            input = tf.nn.leaky_relu(input)
 
         elif oAct == 'softmax':
             input = tf.nn.softmax(input)
@@ -340,19 +343,15 @@ def activate(input, oAct, oBn):
             input = tf.nn.crelu(input)
 
         elif oAct == 'selu':
-            alpha = 1.6732632423543772848170429916717
-            scale = 1.0507009873554804934193349852946
-            input = scale * elu(input, alpha)
+            input = tf.nn.selu(input)
 
         elif oAct == 'swish':
             input = tf.nn.sigmoid(input) * input
 
         elif oAct == 'softplus':
-
             input = tf.nn.softplus(input)
 
         elif oAct == 'softsign':
-
             input = tf.nn.softsign(input)
 
         else:
@@ -362,15 +361,20 @@ def activate(input, oAct, oBn):
 
 
 def lnoise(input, fNoise, fDrop):
+
     if fNoise > 0:
         input = noise(input=input, stddev=fNoise, bMulti=True, bAdd=False)
+
     if fDrop > 0:
         input = dropout(input=input, drop_prob=fDrop)
+
     return input
 
 
 def minibatch_feature(input, n_kernels=100, dim_per_kernel=5, name='minibatch'):
+
     with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
+
         if len(input.get_shape()) > 2:
             input = tf.reshape(input, [input.get_shape().as_list()[0], -1])
 
@@ -390,88 +394,6 @@ def minibatch_feature(input, n_kernels=100, dim_per_kernel=5, name='minibatch'):
         dist = tf.reduce_sum(masked, 2) * rscale
 
     return dist
-
-
-# def upsize(input, targetdim, oUp, name='upsize.'):
-#
-#     name = name + oUp
-#
-#     with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
-#
-#         input_shape = input.get_shape().as_list()
-#
-#         if oUp == 'deconv':
-#             input = deconv2d(input, targetdim, ksize=2, stride=2)
-#
-#         if oUp == 'depth_space':
-#             input = tf.depth_to_space(input, 2, data_format=__data_format__)
-#             input = deconv2d(input, targetdim, ksize=1, stride=1)
-#
-#         if oUp == 'resizen':
-#             input = tf.image.resize_nearest_neighbor(input, [input_shape[1] * 2, input_shape[2] * 2])
-#             input = deconv2d(input, targetdim, ksize=ksize, stride=1)
-#
-#         if oUp == 'resizel':
-#             input = tf.image.resize_bilinear(input, [input_shape[1] * 2, input_shape[2] * 2])
-#             input = deconv2d(input, targetdim, ksize=ksize, stride=1)
-#
-#     return input
-
-
-def upsize(input, oUp, size=2):
-    input_shape = input.get_shape().as_list()
-    h_axis, w_axis, c_axis = [1, 2, 3] if __data_format__ == "NHWC" else [2, 3, 1]
-
-    def get_channel(c):
-        if __data_format__ == "NHWC":
-            return input[:, :, :, c:c + 1]
-        else:
-            return input[:, c:c + 1, :, :]
-
-    if oUp == 'depth_space':
-        input = tf.depth_to_space(input, size, data_format=__data_format__)
-
-    elif oUp == 'resizen':
-        input = tf.transpose(input, [0, h_axis, w_axis, c_axis])
-        input = tf.image.resize_nearest_neighbor(input, [input_shape[h_axis] * size, input_shape[w_axis] * size])
-        input = tf.transpose(input, [0, 3, 1, 2])
-
-    else:
-        assert oUp == 'none'
-
-    return input
-
-
-def downsize(input, oDown, size=2):
-    input_shape = input.get_shape().as_list()
-    h_axis, w_axis, c_axis = [1, 2, 3] if __data_format__ == "NHWC" else [2, 3, 1]
-
-    def get_channel(c):
-        if __data_format__ == "NHWC":
-            return input[:, :, :, c:c + 1]
-        else:
-            return input[:, c:c + 1, :, :]
-
-    if oDown == 'avgpool':
-        input = avgpool(input, size, size)
-
-    elif oDown == 'maxpool':
-        input = maxpool(input, size, size)
-    #
-    # elif oDown == 'space2depth':
-    #     input = tf.space_to_depth(input, 2, data_format=__data_format__)
-    #
-    # elif oDown == 'mixpool':
-    #     input = tf.concat([avgpool(input, size, size), maxpool(input, size, size), maxpool(-input, size, size)], axis=c_axis)
-
-    # elif oDown == 'convpool':
-    #     input = tf.concat([conv2d(get_channel(i), 1, size, size) for i in range(input_shape[c_axis])], axis=c_axis)
-
-    else:
-
-        assert oDown == 'none'
-
-    return input
 
 
 def channel_concat(x, y):

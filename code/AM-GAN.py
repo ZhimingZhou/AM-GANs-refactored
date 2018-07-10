@@ -29,7 +29,7 @@ tf.app.flags.DEFINE_boolean("bWGAN", False, "")
 tf.app.flags.DEFINE_float("fWeightGP", 1.0, "")
 
 tf.app.flags.DEFINE_integer("iMaxIter", 1000000, "")
-tf.app.flags.DEFINE_integer("iBatchSize", 64, "")
+tf.app.flags.DEFINE_integer("iBatchSize", 100, "")
 
 tf.app.flags.DEFINE_integer("iTrainG", 1, "")
 tf.app.flags.DEFINE_integer("iTrainD", 1, "")
