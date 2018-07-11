@@ -1,7 +1,6 @@
 import warnings
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.framework import ops
 from tensorflow.contrib.layers.python.layers.layers import layer_norm
 from tensorflow.contrib.layers.python.layers.initializers import *
 
@@ -142,7 +141,7 @@ def deconv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, 
 
     with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
 
-        w = tf.get_variable('w', [ksize, ksize, output_dim, input_shape[c_axis]], initializer=variance_scaling_initializer(factor=__ini_scale__, mode="FAN_OUT", uniform=False))
+        w = tf.get_variable('w', [ksize, ksize, output_dim, input_shape[c_axis]], initializer=variance_scaling_initializer(factor=__ini_scale__*stride*stride, mode="FAN_OUT", uniform=True))
 
         if __enable_wn__:
             g = tf.get_variable('g', initializer=tf.sqrt(tf.reduce_sum(tf.square(w), [0, 1, 3], keep_dims=True)))
@@ -219,7 +218,7 @@ def linear(input, output_size, bBias=False, name='linear'):
             warnings.warn('using ops \'linear\' with input shape' + str(input.get_shape().as_list()))
             input = tf.reshape(input, [input.get_shape().as_list()[0], -1])
 
-        w = tf.get_variable('w', [input.get_shape().as_list()[1], output_size], initializer=variance_scaling_initializer(factor=__ini_scale__, mode="FAN_IN", uniform=False))
+        w = tf.get_variable('w', [input.get_shape().as_list()[1], output_size], initializer=variance_scaling_initializer(factor=__ini_scale__, mode="FAN_IN", uniform=True))
 
         if __enable_wn__:
             g = tf.get_variable('g', initializer=tf.sqrt(tf.reduce_sum(tf.square(w), [0], keep_dims=True)))
@@ -252,7 +251,7 @@ def avgpool(input, ksize, stride, name='avgpool'):
         kernel = [1, ksize, ksize, 1] if __data_format__ == "NHWC" else [1, 1, ksize, ksize]
         strides = [1, stride, stride, 1] if __data_format__ == "NHWC" else [1, 1, stride, stride]
 
-        input = tf.nn.avg_pool(input, ksize=kernel, strides=strides, padding='VALID', name=name, data_format=__data_format__)  # * ksize
+        input = tf.nn.avg_pool(input, ksize=kernel, strides=strides, padding='VALID', name=name, data_format=__data_format__) * ksize
 
     return input
 
