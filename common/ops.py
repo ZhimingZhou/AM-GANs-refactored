@@ -1,17 +1,21 @@
 import warnings
 import numpy as np
 import tensorflow as tf
-from tensorflow.contrib.layers.python.layers.layers import layer_norm
+from tensorflow.contrib.layers.python.layers import layer_norm
 from tensorflow.contrib.layers.python.layers.initializers import *
 
-__ini_scale__ = 1.0
+__data_format__ = "NCHW"
+
 __enable_wn__ = False
-__enable_sn__ = False
-__enable_snk__ = False
 __enable_bias__ = True
 
+__ini_scale__ = 1.0
+__weight_stddev__ = 0.05
+
 __debug_first_n__ = 0
-__data_format__ = "NCHW"
+
+__enable_sn__ = False
+__enable_snk__ = False
 
 SPECTRAL_NORM_K_LIST = []
 SPECTRAL_NORM_K_INIT_OPS_LIST = []
@@ -141,14 +145,17 @@ def deconv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, 
 
     with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
 
-        w = tf.get_variable('w', [ksize, ksize, output_dim, input_shape[c_axis]], initializer=variance_scaling_initializer(factor=__ini_scale__*stride*stride, mode="FAN_OUT", uniform=True))
-
         if __enable_wn__:
+            w = tf.get_variable('w', [ksize, ksize, output_dim, input_shape[c_axis]], initializer=tf.truncated_normal_initializer(stddev=__weight_stddev__))
             g = tf.get_variable('g', initializer=tf.sqrt(tf.reduce_sum(tf.square(w), [0, 1, 3], keep_dims=True)))
             w = g * tf.nn.l2_normalize(w, [0, 1, 3])
 
-        if __enable_sn__:
+        elif __enable_sn__:
+            w = tf.get_variable('w', [ksize, ksize, output_dim, input_shape[c_axis]], initializer=tf.truncated_normal_initializer(stddev=__weight_stddev__))
             w = spectral_normed_weight(w)[0]
+
+        else:
+            w = tf.get_variable('w', [ksize, ksize, output_dim, input_shape[c_axis]], initializer=variance_scaling_initializer(factor=__ini_scale__ * stride * stride, mode="FAN_OUT", uniform=True))
 
         x = tf.nn.conv2d_transpose(input, w, output_shape=tf.stack(output_shape), strides=strides, padding=padding, data_format=__data_format__)
 
@@ -161,12 +168,10 @@ def deconv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, 
         axis = [0, h_axis, w_axis]
 
         mean, var = tf.nn.moments(input, axes=axis)
-        x = tf.Print(x, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' stride: %d' % stride + ' before',
-                     first_n=__debug_first_n__)
+        x = tf.Print(x, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' stride: %d' % stride + ' before', first_n=__debug_first_n__)
 
         mean, var = tf.nn.moments(x, axes=axis)
-        x = tf.Print(x, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' stride: %d' % stride + ' after',
-                     first_n=__debug_first_n__)
+        x = tf.Print(x, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' stride: %d' % stride + ' after', first_n=__debug_first_n__)
 
     return x
 
@@ -180,14 +185,17 @@ def conv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, na
 
         strides = [1, stride, stride, 1] if __data_format__ == "NHWC" else [1, 1, stride, stride]
 
-        w = tf.get_variable('w', [ksize, ksize, input_shape[c_axis], output_dim], initializer=variance_scaling_initializer(factor=__ini_scale__, mode="FAN_IN", uniform=False))
-
         if __enable_wn__:
+            w = tf.get_variable('w', [ksize, ksize, input_shape[c_axis], output_dim], initializer=tf.truncated_normal_initializer(stddev=__weight_stddev__))
             g = tf.get_variable('g', initializer=tf.sqrt(tf.reduce_sum(tf.square(w), [0, 1, 2], keep_dims=True)))
             w = g * tf.nn.l2_normalize(w, [0, 1, 2])
 
-        if __enable_sn__:
+        elif __enable_sn__:
+            w = tf.get_variable('w', [ksize, ksize, input_shape[c_axis], output_dim], initializer=tf.truncated_normal_initializer(stddev=__weight_stddev__))
             w = spectral_normed_weight(w)[0]
+
+        else:
+            w = tf.get_variable('w', [ksize, ksize, input_shape[c_axis], output_dim], initializer=variance_scaling_initializer(factor=__ini_scale__, mode="FAN_IN", uniform=True))
 
         x = tf.nn.conv2d(input, w, strides=strides, padding=padding, data_format=__data_format__)
 
@@ -200,12 +208,10 @@ def conv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, na
         axis = [0, h_axis, w_axis]
 
         mean, var = tf.nn.moments(input, axes=axis)
-        x = tf.Print(x, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' stride: %d' % stride + ' before',
-                     first_n=__debug_first_n__)
+        x = tf.Print(x, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' stride: %d' % stride + ' before', first_n=__debug_first_n__)
 
         mean, var = tf.nn.moments(x, axes=axis)
-        x = tf.Print(x, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' stride: %d' % stride + ' after',
-                     first_n=__debug_first_n__)
+        x = tf.Print(x, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' stride: %d' % stride + ' after', first_n=__debug_first_n__)
 
     return x
 
@@ -218,14 +224,17 @@ def linear(input, output_size, bBias=False, name='linear'):
             warnings.warn('using ops \'linear\' with input shape' + str(input.get_shape().as_list()))
             input = tf.reshape(input, [input.get_shape().as_list()[0], -1])
 
-        w = tf.get_variable('w', [input.get_shape().as_list()[1], output_size], initializer=variance_scaling_initializer(factor=__ini_scale__, mode="FAN_IN", uniform=True))
-
         if __enable_wn__:
+            w = tf.get_variable('w', [input.get_shape().as_list()[1], output_size], initializer=tf.truncated_normal_initializer(stddev=__weight_stddev__))
             g = tf.get_variable('g', initializer=tf.sqrt(tf.reduce_sum(tf.square(w), [0], keep_dims=True)))
             w = g * tf.nn.l2_normalize(w, [0])
 
-        if __enable_sn__:
+        elif __enable_sn__:
+            w = tf.get_variable('w', [input.get_shape().as_list()[1], output_size], initializer=tf.truncated_normal_initializer(stddev=__weight_stddev__))
             w = spectral_normed_weight(w)[0]
+
+        else:
+            w = tf.get_variable('w', [input.get_shape().as_list()[1], output_size], initializer=variance_scaling_initializer(factor=__ini_scale__, mode="FAN_IN", uniform=True))
 
         x = tf.matmul(input, w)
 
@@ -264,6 +273,17 @@ def maxpool(input, ksize, stride, name='maxpool'):
         strides = [1, stride, stride, 1] if __data_format__ == "NHWC" else [1, 1, stride, stride]
 
         input = tf.nn.max_pool(input, ksize=kernel, strides=strides, padding='VALID', name=name, data_format=__data_format__)
+
+    return input
+
+
+def image_nn_double_size(input, name='resize'):
+
+    with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
+
+        h_axis, w_axis, c_axis = [1, 2, 3] if __data_format__ == "NHWC" else [2, 3, 1]
+        input = tf.concat([input, input, input, input], axis=c_axis)
+        input = tf.depth_to_space(input, 2, data_format=__data_format__)
 
     return input
 

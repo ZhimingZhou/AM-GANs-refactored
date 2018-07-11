@@ -55,44 +55,68 @@ cfg(sys.argv)
 
 def discriminator_dcgan(input):
 
+    layers = []
     iFilterDimsD = cfg.iFilterDimsD
 
     with tf.variable_scope('discriminator', tf.AUTO_REUSE):
 
         h0 = input
+        layers.append(h0)
         h0 = noise(h0, 0.1, bAdd=True)
+        layers.append(h0)
 
         h0 = conv2d(h0, iFilterDimsD * 1, ksize=3, stride=1, name='conv32')  # 32x32
+        layers.append(h0)
         h0 = batch_norm(h0, name='bn32')
+        layers.append(h0)
         h0 = tf.nn.leaky_relu(h0)
+        layers.append(h0)
         h0 = dropout(h0, 0.3)
+        layers.append(h0)
 
         h0 = conv2d(h0, iFilterDimsD * 2, ksize=3, stride=2, name='conv32_16')  # 32x32 --> 16x16
+        layers.append(h0)
         h0 = batch_norm(h0, name='bn16')
+        layers.append(h0)
         h0 = tf.nn.leaky_relu(h0)
         h0 = dropout(h0, 0.3)
+        layers.append(h0)
 
         h0 = conv2d(h0, iFilterDimsD * 4, ksize=3, stride=2, name='conv16_8')  # 16x16 --> 8x8
+        layers.append(h0)
         h0 = batch_norm(h0, name='bn8')
+        layers.append(h0)
         h0 = tf.nn.leaky_relu(h0)
+        layers.append(h0)
         h0 = dropout(h0, 0.3)
+        layers.append(h0)
 
+        layers.append(h0)
         h0 = conv2d(h0, iFilterDimsD * 8, ksize=3, stride=2, name='conv8_4')  # 8x8 --> 4x4
+        layers.append(h0)
         h0 = batch_norm(h0, name='bn4')
+        layers.append(h0)
         h0 = tf.nn.leaky_relu(h0)
+        layers.append(h0)
         h0 = dropout(h0, 0.3)
+        layers.append(h0)
 
         h0 = avgpool(h0, 4, 4)
+        layers.append(h0)
         h0 = tf.contrib.layers.flatten(h0)
+        layers.append(h0)
         h0 = dropout(h0, 0.3)
+        layers.append(h0)
 
         h0 = linear(h0, 11)
+        layers.append(h0)
 
-        return h0
+        return h0, layers
 
 
 def generator_dcgan(num_sample, z=None):
 
+    layers = []
     iFilterDimsG = cfg.iFilterDimsG
 
     with tf.variable_scope('generator', tf.AUTO_REUSE):
@@ -101,52 +125,74 @@ def generator_dcgan(num_sample, z=None):
             h0 = tf.random_normal(shape=[num_sample, cfg.iDimsZ])
         else:
             h0 = z
+        layers.append(h0)
 
         h0 = linear(h0, 4 * 4 * (iFilterDimsG * 8))  # linear 4x4
+        layers.append(h0)
         h0 = tf.reshape(h0, [-1, iFilterDimsG * 8, 4, 4])  # reshape 4x4
+        layers.append(h0)
         h0 = batch_norm(h0, name='bn4')
+        layers.append(h0)
         h0 = tf.nn.leaky_relu(h0)
+        layers.append(h0)
 
         h0 = deconv2d(h0, iFilterDimsG * 4, ksize=3, stride=2, name='deconv4_8')  # 4x4 --> 8x8
+        layers.append(h0)
         h0 = batch_norm(h0, name='bn8')
+        layers.append(h0)
         h0 = tf.nn.leaky_relu(h0)
+        layers.append(h0)
 
         h0 = deconv2d(h0, iFilterDimsG * 2, ksize=3, stride=2, name='deconv8_16')  # 8x8 --> 16x16
+        layers.append(h0)
         h0 = batch_norm(h0, name='bn16')
+        layers.append(h0)
         h0 = tf.nn.leaky_relu(h0)
+        layers.append(h0)
 
         h0 = deconv2d(h0, iFilterDimsG * 1, ksize=3, stride=2, name='deconv16_32')  # 16x16 --> 32x32
+        layers.append(h0)
         h0 = batch_norm(h0, name='bn32')
+        layers.append(h0)
         h0 = tf.nn.leaky_relu(h0)
+        layers.append(h0)
 
         h0 = deconv2d(h0, cfg.iDimsC, ksize=3, stride=1, name='deconv32')  # 32x32
+        layers.append(h0)
         h0 = tf.nn.tanh(h0)
+        layers.append(h0)
 
-        return h0
+        return h0, layers
 
 
 def discriminator_mlp(input):
 
+    layers = []
     iNumLayer = 5
     iFilterDimsD = cfg.iFilterDimsD
 
     with tf.variable_scope('discriminator', tf.AUTO_REUSE):
 
         h0 = input
+        layers.append(h0)
 
         for i in range(iNumLayer):
             h0 = linear(h0, iFilterDimsD, name='linear%d' % i)
+            layers.append(h0)
             if i > 0:
                 h0 = batch_norm(h0, name='bn%d' % i)
+                layers.append(h0)
             h0 = tf.nn.relu(h0)
+            layers.append(h0)
 
         h0 = linear(h0, 11)
 
-        return h0
+        return h0, layers
 
 
 def generator_mlp(num_sample, z=None):
 
+    layers = []
     iNumLayer = 5
     iFilterDimsG = cfg.iFilterDimsG
 
@@ -156,15 +202,20 @@ def generator_mlp(num_sample, z=None):
             h0 = tf.random_normal(shape=[num_sample, cfg.iDimsZ])
         else:
             h0 = z
+        layers.append(h0)
 
         for i in range(iNumLayer):
             h0 = linear(h0, iFilterDimsG, name='linear%d' % i)
+            layers.append(h0)
             h0 = batch_norm(h0, name='bn%d' % i)
+            layers.append(h0)
             h0 = tf.nn.relu(h0)
+            layers.append(h0)
 
         h0 = linear(h0, cfg.iDimsC)
+        layers.append(h0)
 
-        return h0
+        return h0, layers
 
 ############################################################################################################################################
 
@@ -241,6 +292,23 @@ def get_score(samples):
 
     return icp_score, am_score, fid
 
+
+def log_netstate():
+
+    logger.log('\n\n')
+    _datas, _labels = data_gen.__next__()
+
+    _gradient_values = sess.run(gradient_values, feed_dict={real_datas: _datas, real_labels: _labels})
+    for i in range(len(_gradient_values)):
+        logger.log('weight values: %8.5f %8.5f, its gradients: %13.10f, %13.10f   ' % (np.mean(_gradient_values[i][1]), np.std(_gradient_values[i][1]), np.mean(_gradient_values[i][0]), np.std(_gradient_values[i][0])) + gradient_values[i][1].name + ' shape: ' + str(_gradient_values[i][0].shape))
+
+    logger.log('\n\n')
+    _layers, _layer_gradients = sess.run([layers, layer_gradients], feed_dict={real_datas: _datas, real_labels: _labels})
+    for i in range(len(_layers)):
+        logger.log('layer values: %8.5f %8.5f, its gradients: %13.10f, %13.10f   ' % (np.mean(_layers[i]), np.std(_layers[i]), np.mean(_layer_gradients[i]), np.std(_layer_gradients[i])) + layers[i].name + ' shape: ' + str(_layers[i].shape))
+
+    logger.log('\n\n')
+
 ############################################################################################################################################
 
 set_enable_bias(True)
@@ -291,7 +359,7 @@ if cfg.sDataSet == 'cifar10' or cfg.sDataSet == 'mnist':
     discriminator = discriminator_dcgan
 
     real_datas = tf.placeholder(tf.float32, [None, cfg.iDimsC, 32, 32], name='real_datas')
-    fake_datas = generator(cfg.iBatchSize)
+    fake_datas, gen_layers = generator(cfg.iBatchSize)
 else:
     generator = generator_mlp
     discriminator = discriminator_mlp
@@ -302,8 +370,8 @@ else:
 fake_labels = tf.placeholder(tf.int32, shape=[None])
 real_labels = tf.placeholder(tf.int32, shape=[None])
 
-real_logits = discriminator(real_datas)
-fake_logits = discriminator(fake_datas)
+real_logits, real_dis_layers = discriminator(real_datas)
+fake_logits, fake_dis_layers = discriminator(fake_datas)
 
 if cfg.bAMGAN:
 
@@ -350,6 +418,7 @@ dis_vars = [var for var in tot_vars if 'discriminator' in var.name]
 
 global_step = tf.Variable(0, trainable=False, name='global_step')
 lr = tf.train.exponential_decay(cfg.fLrIni, global_step, cfg.iMaxIter // 10, 0.5, True)
+# lr = cfg.fLrIni * tf.maximum(0., 1. - (tf.cast(global_step, tf.float32) / cfg.iMaxIter))
 
 gen_optimizer = None
 
@@ -374,6 +443,13 @@ elif cfg.oOpt == 'adam':
 
 dis_gradient_values = dis_optimizer.compute_gradients(dis_total_loss, var_list=dis_vars)
 dis_optimize_ops = dis_optimizer.apply_gradients(dis_gradient_values)
+
+dis_gradient_values = [(tf.constant(0.0), dis_gradient_value[1]) if dis_gradient_value[0] is None else dis_gradient_value for dis_gradient_value in dis_gradient_values]
+gen_gradient_values = [(tf.constant(0.0), gen_gradient_value[1]) if gen_gradient_value[0] is None else gen_gradient_value for gen_gradient_value in gen_gradient_values]
+gradient_values = gen_gradient_values + dis_gradient_values
+
+layers = gen_layers + real_dis_layers + fake_dis_layers
+layer_gradients = tf.gradients(dis_total_loss, layers)
 
 saver = tf.train.Saver(max_to_keep=1000)
 
@@ -402,8 +478,9 @@ else:
     ini_model(sess)
 
 fixed_noise = tf.constant(np.random.normal(size=(100, cfg.iDimsZ)).astype('float32'))
-fixed_noise_gen = generator(100, fixed_noise)
+fixed_noise_gen = generator(100, fixed_noise)[0]
 
+log_netstate()
 logger.log("Generator Total Parameter Count: {}".format(locale.format("%d", param_count(gen_gradient_values), grouping=True)))
 logger.log("Discriminator Total Parameter Count: {}".format(locale.format("%d", param_count(dis_gradient_values), grouping=True)))
 
@@ -441,6 +518,7 @@ while iter <= cfg.iMaxIter:
     logger.info('klr', _lr * 1000)
 
     if time.time() - last_score_time > 60*30 and cfg.sDataSet == 'cifar10':
+        log_netstate()
         icp_score, am_score, fid = get_score(gen_n_images(50000))
         logger.info('score_fid', fid)
         logger.info('score_icp', icp_score)

@@ -1,6 +1,7 @@
 import os.path
 import sys
 import tarfile
+import math
 
 sSourceDir = '/newNAS/Workspaces/CVGroup/zmzhou/code2018/'
 
@@ -100,7 +101,7 @@ class PreTrainedInception:
 
     def __init__(self):
 
-        self.batch_size = 100 # It does not effect the accuracy. Small batch size need less memory while bit slower
+        self.batch_size = 1 # It does not effect the accuracy. Small batch size need less memory while bit slower
 
         config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
         config.gpu_options.allow_growth = True
@@ -172,12 +173,12 @@ class PreTrainedInception:
                         new_shape.append(None)
                     else:
                         new_shape.append(s)
-                o._shape = tf.TensorShape(new_shape)
-                #o.set_shape(tf.TensorShape(new_shape))
+                # o._shape = tf.TensorShape(new_shape) # works for tensorflow-1.5
+                # o.set_shape(tf.TensorShape(new_shape)) # set_shape() will not change the shape from known to unknown. tensorflow-1.9
 
         pool3 = self.inception_graph.get_tensor_by_name('pool_3:0')
         w = self.inception_graph.get_tensor_by_name("softmax/weights:0")
-        output = tf.matmul(tf.squeeze(pool3), w)
+        output = tf.matmul(tf.reshape(pool3, [-1, 2048]), w)
         self.inception_softmax_w = tf.nn.softmax(output)
 
         b = self.inception_graph.get_tensor_by_name("softmax/biases:0")
