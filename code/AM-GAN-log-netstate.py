@@ -4,6 +4,7 @@ from os import path
 locale.setlocale(locale.LC_ALL, '')
 sys.path.append(path.dirname(path.abspath(__file__)))
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
+SOURCE_DIR = path.dirname(path.abspath(__file__)) + '/../'
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
@@ -15,14 +16,16 @@ from common.logger import Logger
 
 ############################################################################################################################################
 
+allocate_gpu()
+
 cfg = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string("sDataSet", "cifar10", "cifar10, mnist, toy")
 tf.app.flags.DEFINE_string("sResultTag", "test_v0", "your tag for each test case")
 tf.app.flags.DEFINE_boolean("bLoadCheckpoint", False, "bLoadCheckpoint")
 
-tf.app.flags.DEFINE_string("sResultDir", "/newNAS/Workspaces/CVGroup/zmzhou/share2/result/", "where to save the checkpoint and sample")
-tf.app.flags.DEFINE_string("sSourceDir", "/newNAS/Workspaces/CVGroup/zmzhou/share2/code/", "")
+tf.app.flags.DEFINE_string("sResultDir", SOURCE_DIR + "result/", "where to save the checkpoint and sample")
+tf.app.flags.DEFINE_string("sSourceDir", SOURCE_DIR + "code/", "")
 
 tf.app.flags.DEFINE_boolean("bAMGAN", True, "")
 tf.app.flags.DEFINE_boolean("bWGAN", False, "")
@@ -69,8 +72,8 @@ def discriminator_dcgan(input):
         layers.append(h0)
         h0 = batch_norm(h0, name='bn32')
         layers.append(h0)
-        h0 = tf.nn.leaky_relu(h0)
-        layers.append(h0)
+        # h0 = tf.nn.leaky_relu(h0)
+        # layers.append(h0)
         h0 = dropout(h0, 0.3)
         layers.append(h0)
 
@@ -78,16 +81,16 @@ def discriminator_dcgan(input):
         layers.append(h0)
         h0 = batch_norm(h0, name='bn16')
         layers.append(h0)
-        h0 = tf.nn.leaky_relu(h0)
-        h0 = dropout(h0, 0.3)
+        # h0 = tf.nn.leaky_relu(h0)
+        # h0 = dropout(h0, 0.3)
         layers.append(h0)
 
         h0 = conv2d(h0, iFilterDimsD * 4, ksize=3, stride=2, name='conv16_8')  # 16x16 --> 8x8
         layers.append(h0)
         h0 = batch_norm(h0, name='bn8')
         layers.append(h0)
-        h0 = tf.nn.leaky_relu(h0)
-        layers.append(h0)
+        # h0 = tf.nn.leaky_relu(h0)
+        # layers.append(h0)
         h0 = dropout(h0, 0.3)
         layers.append(h0)
 
@@ -96,8 +99,8 @@ def discriminator_dcgan(input):
         layers.append(h0)
         h0 = batch_norm(h0, name='bn4')
         layers.append(h0)
-        h0 = tf.nn.leaky_relu(h0)
-        layers.append(h0)
+        # h0 = tf.nn.leaky_relu(h0)
+        # layers.append(h0)
         h0 = dropout(h0, 0.3)
         layers.append(h0)
 
@@ -133,29 +136,29 @@ def generator_dcgan(num_sample, z=None):
         layers.append(h0)
         h0 = batch_norm(h0, name='bn4')
         layers.append(h0)
-        h0 = tf.nn.leaky_relu(h0)
-        layers.append(h0)
+        # h0 = tf.nn.leaky_relu(h0)
+        # layers.append(h0)
 
         h0 = deconv2d(h0, iFilterDimsG * 4, ksize=3, stride=2, name='deconv4_8')  # 4x4 --> 8x8
         layers.append(h0)
         h0 = batch_norm(h0, name='bn8')
         layers.append(h0)
-        h0 = tf.nn.leaky_relu(h0)
-        layers.append(h0)
+        # h0 = tf.nn.leaky_relu(h0)
+        # layers.append(h0)
 
         h0 = deconv2d(h0, iFilterDimsG * 2, ksize=3, stride=2, name='deconv8_16')  # 8x8 --> 16x16
         layers.append(h0)
         h0 = batch_norm(h0, name='bn16')
         layers.append(h0)
-        h0 = tf.nn.leaky_relu(h0)
-        layers.append(h0)
+        # h0 = tf.nn.leaky_relu(h0)
+        # layers.append(h0)
 
         h0 = deconv2d(h0, iFilterDimsG * 1, ksize=3, stride=2, name='deconv16_32')  # 16x16 --> 32x32
         layers.append(h0)
         h0 = batch_norm(h0, name='bn32')
         layers.append(h0)
-        h0 = tf.nn.leaky_relu(h0)
-        layers.append(h0)
+        # h0 = tf.nn.leaky_relu(h0)
+        # layers.append(h0)
 
         h0 = deconv2d(h0, cfg.iDimsC, ksize=3, stride=1, name='deconv32')  # 32x32
         layers.append(h0)
@@ -483,6 +486,7 @@ fixed_noise_gen = generator(100, fixed_noise)[0]
 log_netstate()
 logger.log("Generator Total Parameter Count: {}".format(locale.format("%d", param_count(gen_gradient_values), grouping=True)))
 logger.log("Discriminator Total Parameter Count: {}".format(locale.format("%d", param_count(dis_gradient_values), grouping=True)))
+logger.log("\n\n")
 
 while iter <= cfg.iMaxIter:
 

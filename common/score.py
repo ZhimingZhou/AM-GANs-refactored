@@ -1,12 +1,12 @@
-import os.path
 import sys
 import tarfile
 import math
-
-sSourceDir = '/newNAS/Workspaces/CVGroup/zmzhou/code2018/'
+from os import path
 
 from common.utils import *
 import scipy as sp
+
+SOURCE_DIR = path.dirname(path.abspath(__file__)) + '/../'
 
 
 class InceptionScore:
@@ -101,7 +101,7 @@ class PreTrainedInception:
 
     def __init__(self):
 
-        self.batch_size = 1 # It does not effect the accuracy. Small batch size need less memory while bit slower
+        self.batch_size = 100 # It does not affect the accuracy. Small batch size need less memory while bit slower
 
         config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
         config.gpu_options.allow_growth = True
@@ -135,7 +135,7 @@ class PreTrainedInception:
 
     def _init_model_(self):
 
-        MODEL_DIR = sSourceDir + '/pretrained_model/inception/'
+        MODEL_DIR = SOURCE_DIR + 'pretrained_model/inception/'
         DATA_URL = 'http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz'
 
         makedirs(MODEL_DIR)
@@ -155,14 +155,15 @@ class PreTrainedInception:
             print('\nSuccesfully downloaded', filename, os.stat(filepath).st_size, 'bytes.')
             tarfile.open(filepath, 'r:gz').extractall(MODEL_DIR)
 
+        with tf.gfile.FastGFile(os.path.join(MODEL_DIR, 'classify_image_graph_def.pb'), 'rb') as f:
+            graph_def = tf.GraphDef()
+            graph_def.ParseFromString(f.read())
+
         with self.inception_graph.as_default():
-            with tf.gfile.FastGFile(os.path.join(MODEL_DIR, 'classify_image_graph_def.pb'), 'rb') as f:
-                graph_def = tf.GraphDef()
-                graph_def.ParseFromString(f.read())
-                _ = tf.import_graph_def(graph_def, name='')
+            tf.import_graph_def(graph_def, name='')
 
         # Works with an arbitrary minibatch size.
-        ops = self.inception_sess.graph.get_operations()
+        ops = self.inception_graph.get_operations()
         for op_idx, op in enumerate(ops):
             for o in op.outputs:
                 shape = o.get_shape()
@@ -173,10 +174,11 @@ class PreTrainedInception:
                         new_shape.append(None)
                     else:
                         new_shape.append(s)
-                # o._shape = tf.TensorShape(new_shape) # works for tensorflow-1.5
-                # o.set_shape(tf.TensorShape(new_shape)) # set_shape() will not change the shape from known to unknown. tensorflow-1.9
+                o._shape = tf.TensorShape(new_shape) # works in tensorflow-1.5; it does not change NodeDef and hence GraphDef.
+                # o._shape_val = tf.TensorShape(new_shape) # works in tensorflow-1.5; it does not change NodeDef and hence GraphDef.
+                # o.set_shape(tf.TensorShape(new_shape)) # failed in tensorflow-1.9. it does not change the shape. because set_shape() will not change the shape from 'known' to 'unknown'. tensorflow-1.9
 
-        pool3 = self.inception_graph.get_tensor_by_name('pool_3:0')
+        pool3 = self.inception_graph.get_tensor_by_name("pool_3:0")
         w = self.inception_graph.get_tensor_by_name("softmax/weights:0")
         output = tf.matmul(tf.reshape(pool3, [-1, 2048]), w)
         self.inception_softmax_w = tf.nn.softmax(output)
@@ -232,8 +234,8 @@ class PreTrainedDenseNet:
 
     def _init_model_(self):
         with self.dense_graph.as_default():
-            saver = tf.train.import_meta_graph('/newNAS/Workspaces/CVGroup/zmzhou/code2018/pretrained_model/densenet/DenseNet-BC_growth_rate=40_depth=40_dataset_C10+/model.chkpt.meta')
-            saver.restore(self.dense_sess, '/newNAS/Workspaces/CVGroup/zmzhou/code2018/pretrained_model/densenet/DenseNet-BC_growth_rate=40_depth=40_dataset_C10+/model.chkpt')
+            saver = tf.train.import_meta_graph(SOURCE_DIR + 'pretrained_model/densenet/DenseNet-BC_growth_rate=40_depth=40_dataset_C10+/model.chkpt.meta')
+            saver.restore(self.dense_sess, SOURCE_DIR + 'pretrained_model/densenet/DenseNet-BC_growth_rate=40_depth=40_dataset_C10+/model.chkpt')
         self.preds = self.dense_graph.get_tensor_by_name('Softmax:0')
         self.activations = self.dense_graph.get_tensor_by_name('Transition_to_classes/Reshape:0')
         self.inputs = self.dense_graph.get_tensor_by_name('input_images:0')

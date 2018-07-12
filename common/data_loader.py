@@ -1,5 +1,9 @@
+from os import path
 import pickle, sys
 from common.utils import *
+
+SOURCE_DIR = path.dirname(path.abspath(__file__)) + '/../'
+
 
 def load_cifar10():
 
@@ -14,14 +18,13 @@ def load_cifar10():
 
         DATA_URL = 'https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
 
-        dest_directory = data_dir
-        makedirs(dest_directory)
+        makedirs(data_dir)
 
         filename = DATA_URL.split('/')[-1]
-        filepath = os.path.join(dest_directory, filename)
+        filepath = os.path.join(data_dir, filename)
 
         remove(filepath)
-        removedirs(dest_directory + '/cifar-10-batches-py/')
+        removedirs(data_dir + '/cifar-10-batches-py/')
 
         def _progress(count, block_size, total_size):
             sys.stdout.write('\r>> Downloading %s %.1f%%' % (filename, float(count * block_size) / float(total_size) * 100.0))
@@ -29,7 +32,7 @@ def load_cifar10():
         filepath, _ = urlretrieve(DATA_URL, filepath, _progress)
         print('\nSuccesfully downloaded', filename, os.stat(filepath).st_size, 'bytes.')
 
-        tarfile.open(filepath, 'r:gz').extractall(dest_directory)
+        tarfile.open(filepath, 'r:gz').extractall(data_dir)
 
     def unpickle(file):
         fo = open(file, 'rb')
@@ -40,9 +43,9 @@ def load_cifar10():
         fo.close()
         return dict
 
-    data_dir = '/newNAS/Workspaces/CVGroup/zmzhou/code2018/dataset/cifar-10-batches-py/'
+    data_dir = SOURCE_DIR + 'dataset/cifar-10-batches-py/'
     if not os.path.exists(data_dir):
-        download_cifar10('/newNAS/Workspaces/CVGroup/zmzhou/code2018/dataset/')
+        download_cifar10(SOURCE_DIR + 'dataset/')
 
     try:
         trfilenames = [os.path.join(data_dir, 'data_batch_%d' % i) for i in range(1, 6)]
@@ -105,7 +108,7 @@ def load_mnist(useX32=True, useC3=False):
             cmd = ['gzip', '-d', out_path]
             subprocess.call(cmd)
 
-    data_dir = '/newNAS/Workspaces/CVGroup/zmzhou/code2018/dataset/mnist/'
+    data_dir = SOURCE_DIR + 'dataset/mnist/'
     if not os.path.exists(data_dir):
         download_mnist(data_dir)
 
