@@ -1,12 +1,10 @@
-import sys, locale, os
+import sys, locale
 from os import path
 
 locale.setlocale(locale.LC_ALL, '')
 sys.path.append(path.dirname(path.abspath(__file__)))
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
-SOURCE_DIR = path.dirname(path.abspath(__file__)) + '/../'
-
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+SOURCE_DIR = path.dirname(path.dirname(path.abspath(__file__))) + '/'
 
 import time
 from common.ops import *
@@ -42,6 +40,7 @@ tf.app.flags.DEFINE_float("fBeta1", 0.5, "")
 tf.app.flags.DEFINE_float("fBeta2", 0.999, "")
 tf.app.flags.DEFINE_float("fEpsilon", 1e-8, "")
 tf.app.flags.DEFINE_string("oOpt", 'adam', "adam, sgd, mom")
+tf.app.flags.DEFINE_string("oAct", 'lrelu', "relu, lrelu, selu")
 
 tf.app.flags.DEFINE_integer("iDimsC", 3, "")
 tf.app.flags.DEFINE_integer("iFilterDimsD", 64, "")
@@ -72,8 +71,8 @@ def discriminator_dcgan(input):
         layers.append(h0)
         h0 = batch_norm(h0, name='bn32')
         layers.append(h0)
-        # h0 = tf.nn.leaky_relu(h0)
-        # layers.append(h0)
+        h0 = activate(h0, cfg.oAct)
+        layers.append(h0)
         h0 = dropout(h0, 0.3)
         layers.append(h0)
 
@@ -81,16 +80,16 @@ def discriminator_dcgan(input):
         layers.append(h0)
         h0 = batch_norm(h0, name='bn16')
         layers.append(h0)
-        # h0 = tf.nn.leaky_relu(h0)
-        # h0 = dropout(h0, 0.3)
+        h0 = activate(h0, cfg.oAct)
+        h0 = dropout(h0, 0.3)
         layers.append(h0)
 
         h0 = conv2d(h0, iFilterDimsD * 4, ksize=3, stride=2, name='conv16_8')  # 16x16 --> 8x8
         layers.append(h0)
         h0 = batch_norm(h0, name='bn8')
         layers.append(h0)
-        # h0 = tf.nn.leaky_relu(h0)
-        # layers.append(h0)
+        h0 = activate(h0, cfg.oAct)
+        layers.append(h0)
         h0 = dropout(h0, 0.3)
         layers.append(h0)
 
@@ -99,8 +98,8 @@ def discriminator_dcgan(input):
         layers.append(h0)
         h0 = batch_norm(h0, name='bn4')
         layers.append(h0)
-        # h0 = tf.nn.leaky_relu(h0)
-        # layers.append(h0)
+        h0 = activate(h0, cfg.oAct)
+        layers.append(h0)
         h0 = dropout(h0, 0.3)
         layers.append(h0)
 
@@ -136,29 +135,29 @@ def generator_dcgan(num_sample, z=None):
         layers.append(h0)
         h0 = batch_norm(h0, name='bn4')
         layers.append(h0)
-        # h0 = tf.nn.leaky_relu(h0)
-        # layers.append(h0)
+        h0 = activate(h0, cfg.oAct)
+        layers.append(h0)
 
         h0 = deconv2d(h0, iFilterDimsG * 4, ksize=3, stride=2, name='deconv4_8')  # 4x4 --> 8x8
         layers.append(h0)
         h0 = batch_norm(h0, name='bn8')
         layers.append(h0)
-        # h0 = tf.nn.leaky_relu(h0)
-        # layers.append(h0)
+        h0 = activate(h0, cfg.oAct)
+        layers.append(h0)
 
         h0 = deconv2d(h0, iFilterDimsG * 2, ksize=3, stride=2, name='deconv8_16')  # 8x8 --> 16x16
         layers.append(h0)
         h0 = batch_norm(h0, name='bn16')
         layers.append(h0)
-        # h0 = tf.nn.leaky_relu(h0)
-        # layers.append(h0)
+        h0 = activate(h0, cfg.oAct)
+        layers.append(h0)
 
         h0 = deconv2d(h0, iFilterDimsG * 1, ksize=3, stride=2, name='deconv16_32')  # 16x16 --> 32x32
         layers.append(h0)
         h0 = batch_norm(h0, name='bn32')
         layers.append(h0)
-        # h0 = tf.nn.leaky_relu(h0)
-        # layers.append(h0)
+        h0 = activate(h0, cfg.oAct)
+        layers.append(h0)
 
         h0 = deconv2d(h0, cfg.iDimsC, ksize=3, stride=1, name='deconv32')  # 32x32
         layers.append(h0)
@@ -185,7 +184,7 @@ def discriminator_mlp(input):
             if i > 0:
                 h0 = batch_norm(h0, name='bn%d' % i)
                 layers.append(h0)
-            h0 = tf.nn.relu(h0)
+            h0 = activate(h0, cfg.oAct)
             layers.append(h0)
 
         h0 = linear(h0, 11)
@@ -212,7 +211,7 @@ def generator_mlp(num_sample, z=None):
             layers.append(h0)
             h0 = batch_norm(h0, name='bn%d' % i)
             layers.append(h0)
-            h0 = tf.nn.relu(h0)
+            h0 = activate(h0, cfg.oAct)
             layers.append(h0)
 
         h0 = linear(h0, cfg.iDimsC)

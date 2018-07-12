@@ -13,8 +13,6 @@ __ini_output_scale__ = 1.0
 __ini_weight_stddev__ = 1.0
 __ini_distribution_type__ = 'uniform' # truncated_normal, normal, uniform
 
-__debug_first_n__ = 0
-
 __enable_sn__ = False
 __enable_snk__ = False
 
@@ -146,12 +144,9 @@ def deconv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, 
 
     with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
 
-        # w = tf.get_variable('w', [ksize, ksize, output_dim, input_shape[c_axis]], initializer=variance_scaling_initializer(factor=__ini_scale__ * stride * stride, mode="FAN_OUT", uniform=True))
         # w = tf.get_variable('w', [ksize, ksize, output_dim, input_shape[c_axis]], initializer=NormalizedOrthogonalInitializer([0, 1, 3], gain=__weight_stddev__))
         w = tf.get_variable('w', [ksize, ksize, output_dim, input_shape[c_axis]], initializer=initializer(__ini_distribution_type__, __ini_weight_stddev__))
         scale = tf.sqrt(__ini_output_scale__ * stride * stride / (ksize * ksize * input_shape[c_axis])) / __ini_weight_stddev__
-
-        # print(tf.Session().run(tf.sqrt(tf.reduce_sum(tf.square(tf.random_normal(stddev=__ini_weight_stddev__, shape=[ksize, ksize, output_dim, input_shape[c_axis]])), [0, 1, 3], keep_dims=True)) * scale))
 
         if __enable_wn__:
             g = tf.get_variable('g', initializer=tf.sqrt(tf.reduce_sum(tf.square(w), [0, 1, 3], keep_dims=True)) * scale)
@@ -169,16 +164,6 @@ def deconv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, 
             b = tf.get_variable('b', initializer=tf.constant_initializer(0.0), shape=[output_dim])
             x = tf.nn.bias_add(x, b, data_format=__data_format__)
 
-    if __debug_first_n__:
-
-        axis = [0, h_axis, w_axis]
-
-        mean, var = tf.nn.moments(input, axes=axis)
-        x = tf.Print(x, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' stride: %d' % stride + ' before', first_n=__debug_first_n__)
-
-        mean, var = tf.nn.moments(x, axes=axis)
-        x = tf.Print(x, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' stride: %d' % stride + ' after', first_n=__debug_first_n__)
-
     return x
 
 
@@ -191,12 +176,9 @@ def conv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, na
 
         strides = [1, stride, stride, 1] if __data_format__ == "NHWC" else [1, 1, stride, stride]
 
-        # w = tf.get_variable('w', [ksize, ksize, input_shape[c_axis], output_dim], initializer=variance_scaling_initializer(factor=__ini_scale__, mode="FAN_IN", uniform=True))
         # w = tf.get_variable('w', [ksize, ksize, input_shape[c_axis], output_dim], initializer=NormalizedOrthogonalInitializer([0, 1, 2], gain=__weight_stddev__))
         w = tf.get_variable('w', [ksize, ksize, input_shape[c_axis], output_dim], initializer=initializer(__ini_distribution_type__, __ini_weight_stddev__))
         scale = tf.sqrt(__ini_output_scale__ / (ksize * ksize * input_shape[c_axis])) / __ini_weight_stddev__
-
-        # print(tf.Session().run(tf.sqrt(tf.reduce_sum(tf.square(tf.random_normal(stddev=__ini_weight_stddev__, shape=[ksize, ksize, input_shape[c_axis], output_dim])), [0, 1, 2], keep_dims=True)) * scale))
 
         if __enable_wn__:
             g = tf.get_variable('g', initializer=tf.sqrt(tf.reduce_sum(tf.square(w), [0, 1, 2], keep_dims=True)) * scale)
@@ -214,16 +196,6 @@ def conv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, na
             b = tf.get_variable('b', initializer=tf.constant_initializer(0.0), shape=[output_dim])
             x = tf.nn.bias_add(x, b, data_format=__data_format__)
 
-    if __debug_first_n__:
-
-        axis = [0, h_axis, w_axis]
-
-        mean, var = tf.nn.moments(input, axes=axis)
-        x = tf.Print(x, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' stride: %d' % stride + ' before', first_n=__debug_first_n__)
-
-        mean, var = tf.nn.moments(x, axes=axis)
-        x = tf.Print(x, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' stride: %d' % stride + ' after', first_n=__debug_first_n__)
-
     return x
 
 
@@ -235,13 +207,10 @@ def linear(input, output_size, bBias=False, name='linear'):
             warnings.warn('using ops \'linear\' with input shape' + str(input.get_shape().as_list()))
             input = tf.reshape(input, [input.get_shape().as_list()[0], -1])
 
-        # w = tf.get_variable('w', [input.get_shape().as_list()[1], output_size], initializer=variance_scaling_initializer(factor=__ini_scale__, mode="FAN_IN", uniform=True))
         # w = tf.get_variable('w', [input.get_shape().as_list()[1], output_size], initializer=NormalizedOrthogonalInitializer([0], gain=__weight_stddev__))
         w = tf.get_variable('w', [input.get_shape().as_list()[1], output_size], initializer=initializer(__ini_distribution_type__, __ini_weight_stddev__))
 
         scale = tf.sqrt(__ini_output_scale__ / input.get_shape().as_list()[1]) / __ini_weight_stddev__
-
-        # print(tf.Session().run(tf.sqrt(tf.reduce_sum(tf.square(tf.random_normal(stddev=__ini_weight_stddev__, shape=[input.get_shape().as_list()[1], output_size])), [0], keep_dims=True)) * scale))
 
         if __enable_wn__:
             g = tf.get_variable('g', initializer=tf.sqrt(tf.reduce_sum(tf.square(w), [0], keep_dims=True)) * scale)
@@ -258,14 +227,6 @@ def linear(input, output_size, bBias=False, name='linear'):
         if __enable_bias__ or bBias:
             b = tf.get_variable('b', initializer=tf.constant_initializer(0.0), shape=[output_size])
             x = tf.nn.bias_add(x, b)
-
-    if __debug_first_n__:
-
-        mean, var = tf.nn.moments(input, axes=[0])
-        x = tf.Print(x, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' before', first_n=__debug_first_n__)
-
-        mean, var = tf.nn.moments(x, axes=[0])
-        x = tf.Print(x, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' after', first_n=__debug_first_n__)
 
     return x
 
@@ -322,41 +283,20 @@ def noise(input, stddev, bAdd=False, bMulti=True, keep_prob=None, name='noise'):
 
 def dropout(input, drop_prob, name='dropout'):
 
-    if __debug_first_n__:
-
-        mean, var = tf.nn.moments(input, axes=[0, 2, 3])
-        input = tf.Print(input, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' before', first_n=__debug_first_n__)
-
     with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
 
         keep_prob = 1.0 - drop_prob
-
         # 0. if [keep_prob, 1.0) and 1. if [1.0, 1.0 + keep_prob)
         random_tensor = keep_prob
         random_tensor += tf.random_uniform(tf.shape(input))
         binary_tensor = tf.floor(random_tensor)
         input = input * binary_tensor * tf.sqrt(1.0 / keep_prob)
-
         # input = tf.nn.dropout(input, 1.0 - drop_prob, name=name) * (1.0 - drop_prob)
-
-    if __debug_first_n__:
-
-        mean, var = tf.nn.moments(input, axes=[0, 2, 3])
-        input = tf.Print(input, [tf.reduce_mean(mean), tf.reduce_mean(var)], tf.contrib.framework.get_name_scope() + '/' + name + ' after', first_n=__debug_first_n__)
 
     return input
 
 
-def activate(input, oAct, oBn):
-
-    with tf.variable_scope(oBn):
-
-        if oBn == 'bn':
-            input = batch_norm(input)
-        elif oBn == 'ln':
-            input = layer_norm(input)
-        else:
-            assert oBn == 'none'
+def activate(input, oAct):
 
     with tf.variable_scope(oAct):
 
@@ -433,12 +373,12 @@ def minibatch_feature(input, n_kernels=100, dim_per_kernel=5, name='minibatch'):
 
 
 def channel_concat(x, y):
+
     x_shapes = x.get_shape().as_list()
     y_shapes = y.get_shape().as_list()
     assert y_shapes[0] == x_shapes[0]
 
     y = tf.reshape(y, [y_shapes[0], 1, 1, y_shapes[1]]) * tf.ones([y_shapes[0], x_shapes[1], x_shapes[2], y_shapes[1]])
-
     return tf.concat([x, y], 3)
 
 
@@ -490,7 +430,6 @@ from tensorflow.python.framework import dtypes
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import linalg_ops
 from tensorflow.python.ops import math_ops
-from tensorflow.python.ops import random_ops
 
 
 class NormalizedOrthogonalInitializer():
@@ -531,18 +470,24 @@ class NormalizedOrthogonalInitializer():
 
 
 def initializer(type, stddev):
+
     if type == 'normal':
         return tf.random_normal_initializer(stddev=stddev)
+
     elif type == 'uniform':
         return tf.random_uniform_initializer(-stddev * tf.sqrt(3.0), stddev * tf.sqrt(3.0))
+
     elif type == 'truncated_normal':
         return tf.truncated_normal_initializer(stddev=stddev * tf.sqrt(1.3))
 
 
 def random(shape, type, stddev):
+
     if type == 'normal':
         return tf.random_normal(shape, stddev=stddev)
+
     elif type == 'uniform':
         return tf.random_uniform(shape, -stddev * tf.sqrt(3.0), stddev * tf.sqrt(3.0))
+
     elif type == 'truncated_normal':
         return tf.truncated_normal(shape, stddev=stddev * tf.sqrt(1.3))

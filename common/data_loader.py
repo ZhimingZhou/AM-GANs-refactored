@@ -2,7 +2,7 @@ from os import path
 import pickle, sys
 from common.utils import *
 
-SOURCE_DIR = path.dirname(path.abspath(__file__)) + '/../'
+SOURCE_DIR = path.dirname(path.dirname(path.abspath(__file__))) + '/'
 
 
 def load_cifar10():

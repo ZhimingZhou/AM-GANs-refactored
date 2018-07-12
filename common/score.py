@@ -6,7 +6,7 @@ from os import path
 from common.utils import *
 import scipy as sp
 
-SOURCE_DIR = path.dirname(path.abspath(__file__)) + '/../'
+SOURCE_DIR = path.dirname(path.dirname(path.abspath(__file__))) + '/'
 
 
 class InceptionScore:
