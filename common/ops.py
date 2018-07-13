@@ -1,17 +1,16 @@
 import warnings
 import numpy as np
 import tensorflow as tf
-from tensorflow.contrib.layers.python.layers import layer_norm
-from tensorflow.contrib.layers.python.layers.initializers import *
+from tensorflow.python.ops import linalg_ops
 
 __data_format__ = "NCHW"
 
 __enable_wn__ = True
 __enable_bias__ = True
 
-__ini_output_scale__ = 1.0
-__ini_weight_stddev__ = 1.0
-__ini_distribution_type__ = 'uniform' # truncated_normal, normal, uniform
+__init_layer_stddev__ = 1.0
+__init_weight_stddev__ = 1.0
+__init_distribution_type__ = 'uniform' # truncated_normal, normal, uniform
 
 __enable_sn__ = False
 __enable_snk__ = False
@@ -23,9 +22,14 @@ SPECTRAL_NORM_UV_UPDATE_OPS_LIST = []
 SPECTRAL_NORM_UV_UPDATE_OPS_VARLIST = []
 
 
-def set_ini_scale(value):
-    global __ini_output_scale__
-    __ini_output_scale__ = value
+def set_init_weight_stddev(stddev):
+    global __init_weight_stddev__
+    __init_weight_stddev__ = stddev
+
+
+def set_init_layer_stddev(value):
+    global __init_layer_stddev__
+    __init_layer_stddev__ = value
 
 
 def set_enable_wn(value):
@@ -144,14 +148,14 @@ def deconv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, 
 
     with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
 
-        # w = tf.get_variable('w', [ksize, ksize, output_dim, input_shape[c_axis]], initializer=NormalizedOrthogonalInitializer([0, 1, 3], gain=__weight_stddev__))
-        w = tf.get_variable('w', [ksize, ksize, output_dim, input_shape[c_axis]], initializer=initializer(__ini_distribution_type__, __ini_weight_stddev__))
-        scale = tf.sqrt(__ini_output_scale__ * stride * stride / (ksize * ksize * input_shape[c_axis])) / __ini_weight_stddev__
+        # w = tf.get_variable('w', [ksize, ksize, output_dim, input_shape[c_axis]], initializer=NormalizedOrthogonalInitializer([0, 1, 3], gain=__ini_weight_stddev__))
+        w = tf.get_variable('w', [ksize, ksize, output_dim, input_shape[c_axis]], initializer=initializer(__init_distribution_type__, __init_weight_stddev__))
 
         if __enable_wn__:
-            g = tf.get_variable('g', initializer=tf.sqrt(tf.reduce_sum(tf.square(w), [0, 1, 3], keep_dims=True)) * scale)
+            g = tf.get_variable('g', initializer=tf.ones_like(tf.reduce_sum(w, [0, 1, 3], keep_dims=True)) * stride)
             w = g * tf.nn.l2_normalize(w, [0, 1, 3])
         else:
+            scale = __init_layer_stddev__ / tf.sqrt(ksize * ksize * input_shape[c_axis]) / __init_weight_stddev__ * stride
             g = tf.get_variable('g', initializer=tf.ones_like(tf.reduce_sum(w, [0, 1, 3], keep_dims=True)) * scale)
             w = g * w
 
@@ -176,14 +180,14 @@ def conv2d(input, output_dim, ksize=3, stride=1, padding='SAME', bBias=False, na
 
         strides = [1, stride, stride, 1] if __data_format__ == "NHWC" else [1, 1, stride, stride]
 
-        # w = tf.get_variable('w', [ksize, ksize, input_shape[c_axis], output_dim], initializer=NormalizedOrthogonalInitializer([0, 1, 2], gain=__weight_stddev__))
-        w = tf.get_variable('w', [ksize, ksize, input_shape[c_axis], output_dim], initializer=initializer(__ini_distribution_type__, __ini_weight_stddev__))
-        scale = tf.sqrt(__ini_output_scale__ / (ksize * ksize * input_shape[c_axis])) / __ini_weight_stddev__
+        # w = tf.get_variable('w', [ksize, ksize, input_shape[c_axis], output_dim], initializer=NormalizedOrthogonalInitializer([0, 1, 2], gain=__ini_weight_stddev__))
+        w = tf.get_variable('w', [ksize, ksize, input_shape[c_axis], output_dim], initializer=initializer(__init_distribution_type__, __init_weight_stddev__))
 
         if __enable_wn__:
-            g = tf.get_variable('g', initializer=tf.sqrt(tf.reduce_sum(tf.square(w), [0, 1, 2], keep_dims=True)) * scale)
+            g = tf.get_variable('g', initializer=tf.ones_like(tf.reduce_sum(w, [0, 1, 2], keep_dims=True)))
             w = g * tf.nn.l2_normalize(w, [0, 1, 2])
         else:
+            scale = __init_layer_stddev__ / tf.sqrt(ksize * ksize * input_shape[c_axis]) / __init_weight_stddev__
             g = tf.get_variable('g', initializer=tf.ones_like(tf.reduce_sum(w, [0, 1, 2], keep_dims=True)) * scale)
             w = g * w
 
@@ -207,15 +211,14 @@ def linear(input, output_size, bBias=False, name='linear'):
             warnings.warn('using ops \'linear\' with input shape' + str(input.get_shape().as_list()))
             input = tf.reshape(input, [input.get_shape().as_list()[0], -1])
 
-        # w = tf.get_variable('w', [input.get_shape().as_list()[1], output_size], initializer=NormalizedOrthogonalInitializer([0], gain=__weight_stddev__))
-        w = tf.get_variable('w', [input.get_shape().as_list()[1], output_size], initializer=initializer(__ini_distribution_type__, __ini_weight_stddev__))
-
-        scale = tf.sqrt(__ini_output_scale__ / input.get_shape().as_list()[1]) / __ini_weight_stddev__
+        # w = tf.get_variable('w', [input.get_shape().as_list()[1], output_size], initializer=normalized_orthogonal_initializer([0], stddev=__ini_weight_stddev__))
+        w = tf.get_variable('w', [input.get_shape().as_list()[1], output_size], initializer=initializer(__init_distribution_type__, __init_weight_stddev__))
 
         if __enable_wn__:
-            g = tf.get_variable('g', initializer=tf.sqrt(tf.reduce_sum(tf.square(w), [0], keep_dims=True)) * scale)
+            g = tf.get_variable('g', initializer=tf.ones_like(tf.reduce_sum(tf.square(w), [0], keep_dims=True)))
             w = g * tf.nn.l2_normalize(w, [0])
         else:
+            scale = __init_layer_stddev__ / tf.sqrt(input.get_shape().as_list()[1]) / __init_weight_stddev__
             g = tf.get_variable('g', initializer=tf.ones_like(tf.reduce_sum(tf.square(w), [0], keep_dims=True)) * scale)
             w = g * w
 
@@ -426,47 +429,31 @@ def spectral_normed_weight(W, num_iters=10):
     return W_bar, sigma, u, v
 
 
-from tensorflow.python.framework import dtypes
-from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import linalg_ops
-from tensorflow.python.ops import math_ops
+def normalized_orthogonal_initializer(flatten_axis, stddev=1.0):
 
-
-class NormalizedOrthogonalInitializer():
-
-    def __init__(self, flatten_axis, gain=1.0, seed=None, dtype=dtypes.float32):
-        self.gain = gain
-        self.seed = seed
-        self.dtype = dtype
-        self.flatten_axis = flatten_axis
-
-    def __call__(self, shape, dtype=None, partition_info=None):
-        if dtype is None:
-            dtype = self.dtype
+    def _initializer(shape, dtype=None, partition_info=None):
 
         if len(shape) < 2:
             raise ValueError("The tensor to initialize must be at least two-dimensional")
 
-        # Flatten the input shape
         num_rows = 1
-        for dim in [shape[i] for i in self.flatten_axis]:
+        for dim in [shape[i] for i in flatten_axis]:
             num_rows *= dim
-        num_cols = shape[list(set(range(len(shape))) - set(self.flatten_axis))[0]]
+        num_cols = shape[list(set(range(len(shape))) - set(flatten_axis))[0]]
 
         flat_shape = (num_cols, num_rows) if num_rows < num_cols else (num_rows, num_cols)
 
         a = random(flat_shape, type='uniform', stddev=1)
         q, r = linalg_ops.qr(a, full_matrices=False)
         # Make Q uniform
-        d = array_ops.diag_part(r)
-        ph = d / math_ops.abs(d)
+        d = tf.diag_part(r)
+        ph = d / tf.abs(d)
         q *= ph
         if num_rows < num_cols:
-            q = array_ops.matrix_transpose(q)
-        return self.gain * array_ops.reshape(q, shape) * np.sqrt(num_rows)
+            q = tf.matrix_transpose(q)
+        return stddev * tf.reshape(q, shape) * np.sqrt(num_rows)
 
-    def get_config(self):
-        return {"gain": self.gain, "seed": self.seed, "dtype": self.dtype.name}
+    return _initializer
 
 
 def initializer(type, stddev):

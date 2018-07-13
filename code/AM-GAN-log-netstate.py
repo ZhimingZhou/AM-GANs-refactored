@@ -14,22 +14,19 @@ from common.logger import Logger
 
 ############################################################################################################################################
 
-allocate_gpu()
-
 cfg = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string("sDataSet", "cifar10", "cifar10, mnist, toy")
 tf.app.flags.DEFINE_string("sResultTag", "test_v0", "your tag for each test case")
-tf.app.flags.DEFINE_boolean("bLoadCheckpoint", False, "bLoadCheckpoint")
+tf.app.flags.DEFINE_boolean("bLoadCheckpoint", True, "bLoadCheckpoint")
 
 tf.app.flags.DEFINE_string("sResultDir", SOURCE_DIR + "result/", "where to save the checkpoint and sample")
 tf.app.flags.DEFINE_string("sSourceDir", SOURCE_DIR + "code/", "")
 
 tf.app.flags.DEFINE_boolean("bAMGAN", True, "")
-tf.app.flags.DEFINE_boolean("bWGAN", False, "")
-tf.app.flags.DEFINE_float("fWeightGP", 1.0, "")
+tf.app.flags.DEFINE_float("fWeightGP", 0.0, "")
 
-tf.app.flags.DEFINE_integer("iMaxIter", 1000000, "")
+tf.app.flags.DEFINE_integer("iMaxIter", 100000, "")
 tf.app.flags.DEFINE_integer("iBatchSize", 100, "")
 
 tf.app.flags.DEFINE_integer("iTrainG", 1, "")
@@ -44,18 +41,24 @@ tf.app.flags.DEFINE_string("oAct", 'lrelu', "relu, lrelu, selu")
 
 tf.app.flags.DEFINE_integer("iDimsC", 3, "")
 tf.app.flags.DEFINE_integer("iFilterDimsD", 64, "")
+tf.app.flags.DEFINE_float("fDropRate", 0.3, "")
 
 tf.app.flags.DEFINE_integer("iDimsZ", 100, "")
 tf.app.flags.DEFINE_integer("iFilterDimsG", 96, "")
 
 tf.app.flags.DEFINE_boolean("bUseWN", True, "")
-tf.app.flags.DEFINE_float("fIniScale", 1.0, "")
+tf.app.flags.DEFINE_float("fInitLayerStddev", 1.0, "")
+tf.app.flags.DEFINE_float("fInitWeightStddev", 0.02, "")
+
+tf.app.flags.DEFINE_integer("GPU", -1, "")
 
 cfg(sys.argv)
 
+allocate_gpu(cfg.GPU)
+
 ############################################################################################################################################
 
-def discriminator_dcgan(input):
+def discriminator_dcgan(input, num_logits):
 
     layers = []
     iFilterDimsD = cfg.iFilterDimsD
@@ -73,7 +76,7 @@ def discriminator_dcgan(input):
         layers.append(h0)
         h0 = activate(h0, cfg.oAct)
         layers.append(h0)
-        h0 = dropout(h0, 0.3)
+        h0 = dropout(h0, cfg.fDropRate)
         layers.append(h0)
 
         h0 = conv2d(h0, iFilterDimsD * 2, ksize=3, stride=2, name='conv32_16')  # 32x32 --> 16x16
@@ -81,7 +84,8 @@ def discriminator_dcgan(input):
         h0 = batch_norm(h0, name='bn16')
         layers.append(h0)
         h0 = activate(h0, cfg.oAct)
-        h0 = dropout(h0, 0.3)
+        layers.append(h0)
+        h0 = dropout(h0, cfg.fDropRate)
         layers.append(h0)
 
         h0 = conv2d(h0, iFilterDimsD * 4, ksize=3, stride=2, name='conv16_8')  # 16x16 --> 8x8
@@ -90,7 +94,7 @@ def discriminator_dcgan(input):
         layers.append(h0)
         h0 = activate(h0, cfg.oAct)
         layers.append(h0)
-        h0 = dropout(h0, 0.3)
+        h0 = dropout(h0, cfg.fDropRate)
         layers.append(h0)
 
         layers.append(h0)
@@ -100,17 +104,17 @@ def discriminator_dcgan(input):
         layers.append(h0)
         h0 = activate(h0, cfg.oAct)
         layers.append(h0)
-        h0 = dropout(h0, 0.3)
+        h0 = dropout(h0, cfg.fDropRate)
         layers.append(h0)
 
-        h0 = avgpool(h0, 4, 4)
+        h0 = avgpool(h0, h0.get_shape().as_list()[2], h0.get_shape().as_list()[3])
         layers.append(h0)
         h0 = tf.contrib.layers.flatten(h0)
         layers.append(h0)
-        h0 = dropout(h0, 0.3)
+        h0 = dropout(h0, cfg.fDropRate)
         layers.append(h0)
 
-        h0 = linear(h0, 11)
+        h0 = linear(h0, num_logits)
         layers.append(h0)
 
         return h0, layers
@@ -167,7 +171,7 @@ def generator_dcgan(num_sample, z=None):
         return h0, layers
 
 
-def discriminator_mlp(input):
+def discriminator_mlp(input, num_logits):
 
     layers = []
     iNumLayer = 5
@@ -187,7 +191,7 @@ def discriminator_mlp(input):
             h0 = activate(h0, cfg.oAct)
             layers.append(h0)
 
-        h0 = linear(h0, 11)
+        h0 = linear(h0, num_logits)
 
         return h0, layers
 
@@ -265,8 +269,8 @@ def gen_n_images(n):
     return images[:n]
 
 
-ref_am_preds, ref_am_activations = None, None
-am_model = PreTrainedDenseNet()
+# ref_am_preds, ref_am_activations = None, None
+# am_model = PreTrainedDenseNet()
 
 ref_icp_preds, ref_icp_activations = None, None
 icp_model = PreTrainedInception()
@@ -280,19 +284,19 @@ def get_score(samples):
         ref_icp_preds, ref_icp_activations = icp_model.get_preds(dataX.transpose(0, 2, 3, 1))
         logger.log('\nref_icp_score: %.3f\n' % InceptionScore.inception_score_H(ref_icp_preds)[0])
 
-    if ref_am_preds is None:
-        logger.log('Evaluating Reference Statistic: am_model')
-        ref_am_preds, ref_am_activations = am_model.get_preds(dataX.transpose(0, 2, 3, 1))
+    # if ref_am_preds is None:
+    #     logger.log('Evaluating Reference Statistic: am_model')
+    #     ref_am_preds, ref_am_activations = am_model.get_preds(dataX.transpose(0, 2, 3, 1))
 
     logger.log('Evaluating Generator Statistic')
     icp_preds, icp_activcations = icp_model.get_preds(samples.transpose(0, 2, 3, 1))
-    am_preds, am_activations = am_model.get_preds(samples.transpose(0, 2, 3, 1), dataX.transpose(0, 2, 3, 1))
+    # am_preds, am_activations = am_model.get_preds(samples.transpose(0, 2, 3, 1), dataX.transpose(0, 2, 3, 1))
 
     icp_score = InceptionScore.inception_score_KL(icp_preds)
-    am_score = AMScore.am_score(am_preds, ref_am_preds)[0]
+    # am_score = AMScore.am_score(am_preds, ref_am_preds)[0]
     fid = FID.get_FID_with_activations(icp_activcations, ref_icp_activations)
 
-    return icp_score, am_score, fid
+    return icp_score, 0, fid
 
 
 def log_netstate():
@@ -316,7 +320,8 @@ def log_netstate():
 set_enable_bias(True)
 set_data_format('NCHW')
 set_enable_wn(cfg.bUseWN)
-set_ini_scale(cfg.fIniScale)
+set_init_layer_stddev(cfg.fInitLayerStddev)
+set_init_weight_stddev(cfg.fInitWeightStddev)
 
 dataX, dataY, testX, testY = load_dataset(cfg.sDataSet)
 data_gen = labeled_data_gen_epoch(dataX, dataY, cfg.iBatchSize)
@@ -372,8 +377,9 @@ else:
 fake_labels = tf.placeholder(tf.int32, shape=[None])
 real_labels = tf.placeholder(tf.int32, shape=[None])
 
-real_logits, real_dis_layers = discriminator(real_datas)
-fake_logits, fake_dis_layers = discriminator(fake_datas)
+num_logits = 11 if cfg.bAMGAN else 1
+real_logits, real_dis_layers = discriminator(real_datas, num_logits)
+fake_logits, fake_dis_layers = discriminator(fake_datas, num_logits)
 
 if cfg.bAMGAN:
 
@@ -383,21 +389,13 @@ if cfg.bAMGAN:
     dis_gan_loss = dis_fake_loss + dis_real_loss
     gen_gan_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=fake_logits, labels=tf.stop_gradient(tf.to_int32(tf.arg_max(fake_logits[:, :10], 1)))))
 
-elif cfg.bWGAN:
-
-    dis_real_loss = -tf.reduce_mean(real_logits[:, 0])
-    dis_fake_loss = tf.reduce_mean(fake_logits[:, 0])
-
-    dis_gan_loss = dis_fake_loss + dis_real_loss
-    gen_gan_loss = -tf.reduce_mean(fake_logits[:, 0])
-
 else:
 
-    dis_real_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=real_logits[:, 0], labels=tf.ones_like(real_logits[:, 0])))
-    dis_fake_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=fake_logits[:, 0], labels=tf.zeros_like(fake_logits[:, 0])))
+    dis_real_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=real_logits, labels=tf.ones_like(real_logits)))
+    dis_fake_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=fake_logits, labels=tf.zeros_like(fake_logits)))
 
     dis_gan_loss = dis_fake_loss + dis_real_loss
-    gen_gan_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=fake_logits[:, 0], labels=tf.ones_like(fake_logits[:, 0])))
+    gen_gan_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=fake_logits, labels=tf.ones_like(fake_logits)))
 
 gen_total_loss = gen_gan_loss
 dis_total_loss = dis_gan_loss
@@ -405,13 +403,13 @@ dis_total_loss = dis_gan_loss
 slopes = tf.constant(0.0)
 gp_loss = tf.constant(0.0)
 
-if cfg.bWGAN:
+if cfg.fWeightGP > 0:
     alpha = tf.random_uniform(shape=[cfg.iBatchSize, 1] if cfg.sDataSet == 'toy' else [cfg.iBatchSize, 1, 1, 1], minval=0., maxval=1.)
     differences = fake_datas - real_datas
     interpolates = real_datas + alpha * differences
-    gradients = tf.gradients(discriminator(interpolates)[0][:, 0], [interpolates])[0]
+    gradients = tf.gradients(tf.reduce_sum(tf.abs(discriminator(interpolates, num_logits)[0]), 1), [interpolates])[0]
     slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients), axis=[1] if cfg.sDataSet == 'toy' else [1, 2, 3]))
-    gp_loss = cfg.fWeightGP * tf.reduce_mean(tf.maximum(0.0, slopes - 1.) ** 2)
+    gp_loss = cfg.fWeightGP * tf.reduce_mean(slopes**2)
     dis_total_loss += gp_loss
 
 tot_vars = tf.trainable_variables()
@@ -419,8 +417,7 @@ gen_vars = [var for var in tot_vars if 'generator' in var.name]
 dis_vars = [var for var in tot_vars if 'discriminator' in var.name]
 
 global_step = tf.Variable(0, trainable=False, name='global_step')
-lr = tf.train.exponential_decay(cfg.fLrIni, global_step, cfg.iMaxIter // 10, 0.5, True)
-# lr = cfg.fLrIni * tf.maximum(0., 1. - (tf.cast(global_step, tf.float32) / cfg.iMaxIter))
+lr = cfg.fLrIni * tf.maximum(0., 1. - (tf.cast(global_step, tf.float32) / cfg.iMaxIter))
 
 gen_optimizer = None
 
@@ -494,8 +491,8 @@ while iter <= cfg.iMaxIter:
 
     for id in range(cfg.iTrainD):
         _datas, _labels = data_gen.__next__()
-        _, _dis_total_loss, _dis_gan_loss, _gp_loss, _slopes, _lr, _real_logits, _fake_logits = sess.run(
-            [dis_optimize_ops, dis_total_loss, dis_gan_loss, gp_loss, slopes, lr, real_logits, fake_logits],
+        _, _dis_total_loss, _dis_gan_loss, _lr, _gp_loss, _slopes, _real_logits, _fake_logits = sess.run(
+            [dis_optimize_ops, dis_total_loss, dis_gan_loss, lr, gp_loss, slopes, real_logits, fake_logits],
             feed_dict={real_datas: _datas, real_labels: _labels})
 
     for ig in range(cfg.iTrainG):
@@ -503,6 +500,7 @@ while iter <= cfg.iMaxIter:
             [gen_optimize_ops, gen_total_loss, gen_gan_loss, lr, fake_logits])
 
     logger.tick(iter)
+    logger.info('klr', _lr * 1000)
     logger.info('time', time.time() - start_time)
 
     logger.info('loss_dis_total', _dis_total_loss)
@@ -512,20 +510,24 @@ while iter <= cfg.iMaxIter:
     logger.info('loss_gen_total', _gen_total_loss)
     logger.info('loss_gen_gan', _gen_gan_loss)
 
-    logger.info('logit_real', np.mean(np.max(_real_logits[:, :10], 1)))
-    logger.info('logit_fake', np.mean(np.max(_fake_logits[:, :10], 1)))
+    if cfg.bAMGAN:
+        logger.info('logit_real_rsum', np.mean(np.sum(softmax(_real_logits)[:, :10], 1)))
+        logger.info('logit_fake_rsum', np.mean(np.sum(softmax(_fake_logits)[:, :10], 1)))
+        logger.info('logit_real_rmax', np.mean(np.max(softmax(_real_logits)[:, :10], 1)))
+        logger.info('logit_fake_rmax', np.mean(np.max(softmax(_fake_logits)[:, :10], 1)))
+    else:
+        logger.info('logit_real_r2', np.mean(_real_logits))
+        logger.info('logit_fake_r2', np.mean(_fake_logits))
 
     logger.info('slope_mean', np.mean(_slopes))
     logger.info('slope_max', np.max(_slopes))
 
-    logger.info('klr', _lr * 1000)
-
-    if time.time() - last_score_time > 60*30 and cfg.sDataSet == 'cifar10':
+    if time.time() - last_score_time > 60*60 and cfg.sDataSet == 'cifar10':
         log_netstate()
         icp_score, am_score, fid = get_score(gen_n_images(50000))
         logger.info('score_fid', fid)
-        logger.info('score_icp', icp_score)
         logger.info('score_am', am_score)
+        logger.info('score_icp', icp_score)
         last_score_time = time.time()
 
     if time.time() - last_save_time > 60*30:

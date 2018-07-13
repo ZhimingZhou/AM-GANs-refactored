@@ -317,3 +317,8 @@ def random_augment_all_images(initial_images, pad=4, data_format="NCHW"):
     for i in range(initial_images.shape[0]):
         new_images[i] = random_augment_image_nchw(initial_images[i], pad=pad, data_format=data_format)
     return new_images
+
+
+def softmax(x):
+    e_x = np.exp(x - np.max(x, 1, keepdims=True))
+    return e_x / e_x.sum(axis=1, keepdims=True)

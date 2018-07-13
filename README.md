@@ -6,4 +6,19 @@ It also provides modularized implementation of evaluation metrics including AM-S
 
 It was written with tensorflow-1.5 and python3.5. You can setting up the required environments according to build_env.sh.
 
-To make it clean and adapt to new version of tensorflow, the network sturctures and hyperparameters are slight different from [AM-GAN](https://github.com/ZhimingZhou/AM-GAN).
+Note that the network sturctures and hyperparameters are slight different from [AM-GAN](https://github.com/ZhimingZhou/AM-GAN).
+
+In traditional GANs (including vanilla GAN, least-square GAN etc.), balcance of G and D is very important. In practice, we usually adjust the hyper-parameters such that the discriminator is hard to distinguish the real and fake samples during the training process.
+
+An theoretical explanation of the above issue can be found in https://arxiv.org/abs/1807.00751, where a study on how hyper-parameters influences GANs' training was also provided.
+
+'''
+The gradient from traditional GANs can be unwarranted and does not guarantee convergence (though have global minimum at p_g=p_data).
+
+Empirically, when the discriminator is hard to distinguish the real and fake samples, the gradient from traditional GANs is more reliable.
+
+To ensure meaningful gradient direction and convergence for the training of GANs, it requires defining the D(x) not only on p_g and p_data but also the whole space X or at least a path from p_g
+to p_data. Lipschitz constraint is one of the tool that can achieve the required properties. GANs that holds this property includes Wasserstein GAN, Coulomb GAN.
+
+See https://arxiv.org/abs/1807.00751 for more details.
+'''
