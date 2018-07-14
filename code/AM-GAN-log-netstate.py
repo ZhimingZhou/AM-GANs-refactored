@@ -18,7 +18,7 @@ cfg = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string("sDataSet", "cifar10", "cifar10, mnist, toy")
 tf.app.flags.DEFINE_string("sResultTag", "test_v0", "your tag for each test case")
-tf.app.flags.DEFINE_boolean("bLoadCheckpoint", True, "bLoadCheckpoint")
+tf.app.flags.DEFINE_boolean("bLoadCheckpoint", False, "bLoadCheckpoint")
 
 tf.app.flags.DEFINE_string("sResultDir", SOURCE_DIR + "result/", "where to save the checkpoint and sample")
 tf.app.flags.DEFINE_string("sSourceDir", SOURCE_DIR + "code/", "")
@@ -26,7 +26,7 @@ tf.app.flags.DEFINE_string("sSourceDir", SOURCE_DIR + "code/", "")
 tf.app.flags.DEFINE_boolean("bAMGAN", True, "")
 tf.app.flags.DEFINE_float("fWeightGP", 0.0, "")
 
-tf.app.flags.DEFINE_integer("iMaxIter", 100000, "")
+tf.app.flags.DEFINE_integer("iMaxIter", 1000000, "")
 tf.app.flags.DEFINE_integer("iBatchSize", 100, "")
 
 tf.app.flags.DEFINE_integer("iTrainG", 1, "")
@@ -36,15 +36,18 @@ tf.app.flags.DEFINE_float("fLrIni", 0.0004, "")
 tf.app.flags.DEFINE_float("fBeta1", 0.5, "")
 tf.app.flags.DEFINE_float("fBeta2", 0.999, "")
 tf.app.flags.DEFINE_float("fEpsilon", 1e-8, "")
+tf.app.flags.DEFINE_string("oDecay", 'linear', "exp, linear")
 tf.app.flags.DEFINE_string("oOpt", 'adam', "adam, sgd, mom")
+
 tf.app.flags.DEFINE_string("oAct", 'lrelu', "relu, lrelu, selu")
 
 tf.app.flags.DEFINE_integer("iDimsC", 3, "")
-tf.app.flags.DEFINE_integer("iFilterDimsD", 64, "")
+tf.app.flags.DEFINE_integer("iDimsZ", 100, "")
+
 tf.app.flags.DEFINE_float("fDropRate", 0.3, "")
 
-tf.app.flags.DEFINE_integer("iDimsZ", 100, "")
 tf.app.flags.DEFINE_integer("iFilterDimsG", 96, "")
+tf.app.flags.DEFINE_integer("iFilterDimsD", 64, "")
 
 tf.app.flags.DEFINE_boolean("bUseWN", True, "")
 tf.app.flags.DEFINE_float("fInitLayerStddev", 1.0, "")
@@ -72,8 +75,8 @@ def discriminator_dcgan(input, num_logits):
 
         h0 = conv2d(h0, iFilterDimsD * 1, ksize=3, stride=1, name='conv32')  # 32x32
         layers.append(h0)
-        h0 = batch_norm(h0, name='bn32')
-        layers.append(h0)
+        # h0 = batch_norm(h0, name='bn32')
+        # layers.append(h0)
         h0 = activate(h0, cfg.oAct)
         layers.append(h0)
         h0 = dropout(h0, cfg.fDropRate)
@@ -269,8 +272,8 @@ def gen_n_images(n):
     return images[:n]
 
 
-# ref_am_preds, ref_am_activations = None, None
-# am_model = PreTrainedDenseNet()
+ref_am_preds, ref_am_activations = None, None
+am_model = PreTrainedDenseNet()
 
 ref_icp_preds, ref_icp_activations = None, None
 icp_model = PreTrainedInception()
@@ -279,24 +282,25 @@ icp_model = PreTrainedInception()
 def get_score(samples):
 
     global ref_icp_preds, ref_icp_activations, ref_am_preds, ref_am_activations
+
     if ref_icp_activations is None:
         logger.log('Evaluating Reference Statistic: icp_model')
         ref_icp_preds, ref_icp_activations = icp_model.get_preds(dataX.transpose(0, 2, 3, 1))
         logger.log('\nref_icp_score: %.3f\n' % InceptionScore.inception_score_H(ref_icp_preds)[0])
 
-    # if ref_am_preds is None:
-    #     logger.log('Evaluating Reference Statistic: am_model')
-    #     ref_am_preds, ref_am_activations = am_model.get_preds(dataX.transpose(0, 2, 3, 1))
+    if ref_am_preds is None:
+        logger.log('Evaluating Reference Statistic: am_model')
+        ref_am_preds, ref_am_activations = am_model.get_preds(dataX.transpose(0, 2, 3, 1))
 
     logger.log('Evaluating Generator Statistic')
     icp_preds, icp_activcations = icp_model.get_preds(samples.transpose(0, 2, 3, 1))
-    # am_preds, am_activations = am_model.get_preds(samples.transpose(0, 2, 3, 1), dataX.transpose(0, 2, 3, 1))
+    am_preds, am_activations = am_model.get_preds(samples.transpose(0, 2, 3, 1), dataX.transpose(0, 2, 3, 1))
 
     icp_score = InceptionScore.inception_score_KL(icp_preds)
-    # am_score = AMScore.am_score(am_preds, ref_am_preds)[0]
+    am_score = AMScore.am_score(am_preds, ref_am_preds)[0]
     fid = FID.get_FID_with_activations(icp_activcations, ref_icp_activations)
 
-    return icp_score, 0, fid
+    return icp_score, am_score, fid
 
 
 def log_netstate():
@@ -357,6 +361,7 @@ tf.logging.set_verbosity(tf.logging.ERROR)
 
 config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
 config.gpu_options.allow_growth = True
+
 sess = tf.Session(config=config)
 
 ############################################################################################################################################
@@ -417,7 +422,13 @@ gen_vars = [var for var in tot_vars if 'generator' in var.name]
 dis_vars = [var for var in tot_vars if 'discriminator' in var.name]
 
 global_step = tf.Variable(0, trainable=False, name='global_step')
-lr = cfg.fLrIni * tf.maximum(0., 1. - (tf.cast(global_step, tf.float32) / cfg.iMaxIter))
+
+if cfg.oDecay == 'linear':
+    lr = cfg.fLrIni * tf.maximum(0., 1. - (tf.cast(global_step, tf.float32) / cfg.iMaxIter))
+elif cfg.oDecay == 'exp':
+    lr = tf.train.exponential_decay(cfg.fLrIni, global_step, cfg.iMaxIter // 10, 0.5, True)
+else:
+    lr = cfg.fLrIni
 
 gen_optimizer = None
 
@@ -523,7 +534,6 @@ while iter <= cfg.iMaxIter:
     logger.info('slope_max', np.max(_slopes))
 
     if time.time() - last_score_time > 60*60 and cfg.sDataSet == 'cifar10':
-        log_netstate()
         icp_score, am_score, fid = get_score(gen_n_images(50000))
         logger.info('score_fid', fid)
         logger.info('score_am', am_score)
@@ -531,9 +541,11 @@ while iter <= cfg.iMaxIter:
         last_score_time = time.time()
 
     if time.time() - last_save_time > 60*30:
+        log_netstate()
         logger.save()
         save_model(saver, sess, sCheckpointDir, step=iter)
         last_save_time = time.time()
+        logger.log('\n\nModel Saved\n\n')
 
     if time.time() - last_log_time > 60*1:
         logger.flush()

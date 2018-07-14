@@ -215,14 +215,16 @@ class PreTrainedDenseNet:
         for ch in range(ref_images.shape[-1]):
             means.append(np.mean(ref_images[:, :, :, ch]))
             stds.append(np.std(ref_images[:, :, :, ch]))
+
+        images_standardized = np.zeros_like(images)
         for i in range(images.shape[-1]):
-            images[:, :, :, i] = ((images[:, :, :, i] - means[i]) / stds[i])
+            images_standardized[:, :, :, i] = ((images[:, :, :, i] - means[i]) / stds[i])
 
         preds = []
         activations = []
-        f_batches = int(math.ceil(float(images.shape[0]) / float(self.batch_size)))
+        f_batches = int(math.ceil(float(images_standardized.shape[0]) / float(self.batch_size)))
         for i in range(f_batches):
-            image = images[(i * self.batch_size): min((i + 1) * self.batch_size, images.shape[0])]
+            image = images_standardized[(i * self.batch_size): min((i + 1) * self.batch_size, images_standardized.shape[0])]
             pred, activation = self.dense_sess.run([self.preds, self.activations], {self.inputs: image, self.is_training: False})
             preds.append(pred)
             activations.append(activation)
