@@ -13,7 +13,7 @@ The gradient from traditional GANs can be unwarranted and does not guarantee con
 Empirically, when the discriminator is hard to distinguish the real and fake samples, the gradient from traditional GANs is more reliable.
 
 To ensure meaningful gradient direction and convergence for the training of GANs, it requires defining the D(x) not only on p_g and p_data but also the whole space X or at least a path from p_g
-to p_data. Lipschitz constraint is one of the tool that can achieve the required properties. GANs that holds this property includes Wasserstein GAN, Coulomb GAN.
+to p_data. Lipschitz constraint is one of the tools that can achieve the required properties. GANs that holds this property includes Wasserstein GAN, Coulomb GAN, etc. 
 
-See https://arxiv.org/abs/1807.00751 for more details.
+See https://arxiv.org/abs/1807.00751 for more details and generalized discussion on the properties of Lipschitz in GANs.
 ```
