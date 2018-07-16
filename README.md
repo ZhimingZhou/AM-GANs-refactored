@@ -2,13 +2,13 @@
 
 This is a clean implementation of AM-GAN.
 
-It also provides modularized implementation of evaluation metrics including AM-Score, Inpcetion-Score and FID, along with a simple yet powerful logger system.
+It also provides modularized implementation of evaluation metrics including AM-Score, Inception-Score and FID, along with a simple yet powerful logger system.
 
 It was written with tensorflow-1.5 and python3.5. You can setting up the required environments according to build_env.sh.
 
-Note that the network sturctures and hyperparameters are slight different from [AM-GAN](https://github.com/ZhimingZhou/AM-GAN).
+Note that the network structures and hyper-parameters are slight different from [AM-GAN](https://github.com/ZhimingZhou/AM-GAN).
 
-In traditional GANs (including vanilla GAN, least-square GAN etc.), balcance of G and D is very important. In practice, we usually adjust the hyper-parameters such that the discriminator is hard to distinguish the real and fake samples during the training process.
+In traditional GANs (including vanilla GAN, least-square GAN etc.), balance of G and D is very important. In practice, we usually adjust the hyper-parameters such that the discriminator is hard to distinguish the real and fake samples during the training process.
 
 An theoretical explanation of the above issue can be found in https://arxiv.org/abs/1807.00751, where a study on how hyper-parameters influences GANs' training was also provided.
 

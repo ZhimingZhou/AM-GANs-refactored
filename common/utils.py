@@ -10,16 +10,16 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 
-def allocate_gpu(GPU_ID=-1, maxLoad=0.1, maxMem=0.5, order='memory'):
-    if GPU_ID == -1:
+def allocate_gpu(gpu_id=-1, maxLoad=0.1, maxMem=0.5, order='memory'):
+    if gpu_id == -1:
         try:
             import common.GPUtil as GPUtil
-            GPU_ID = GPUtil.getFirstAvailable(order=order, maxLoad=maxLoad, maxMemory=maxMem)[0]
+            gpu_id = GPUtil.getFirstAvailable(order=order, maxLoad=maxLoad, maxMemory=maxMem)[0]
         except:
-            GPU_ID = 0
+            gpu_id = 0
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(GPU_ID)
-    return GPU_ID
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+    return gpu_id
 
 
 def ini_model(sess):
