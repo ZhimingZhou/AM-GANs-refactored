@@ -53,7 +53,7 @@ def cond_norm(axes, inputs, labels=None, n_labels=None, name=None):
     mean, var = tf.nn.moments(inputs, axes, keep_dims=True)
     n_neurons = inputs.get_shape().as_list()[list((set(range(len(inputs.get_shape()))) - set(axes)))[0]]
 
-    if labels == None:
+    if labels is None:
 
         offset = tf.get_variable(name + '.offset', initializer=np.zeros(mean.get_shape().as_list(), dtype='float32'))
         scale = tf.get_variable(name + '.scale', initializer=np.ones(var.get_shape().as_list(), dtype='float32'))
