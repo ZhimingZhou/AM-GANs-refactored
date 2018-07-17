@@ -6,7 +6,7 @@ It was written with tensorflow-1.5 and python3.5. You can setting up the require
 
 In traditional GANs (including vanilla GAN, least-square GAN etc.), balance of G and D is very important. In practice, we usually adjust the hyper-parameters such that the discriminator is hard to distinguish the real and fake samples during the training process. 
 
-An theoretical explanation of the above issue can be found in https://arxiv.org/abs/1807.00751.
+An theoretical explanation and solution of the above issue can be found in https://arxiv.org/abs/1807.00751.
 
 ```
 The gradient from traditional GANs can be unwarranted and does not guarantee convergence (though have global minimum at p_g=p_data).
