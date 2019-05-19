@@ -1,4 +1,4 @@
-# AM-GAN2
+# AM-GAN
 
 This is a clean implementation of AM-GAN. It also provides modularized implementation of evaluation metrics including AM-Score, Inception-Score and FID, along with a simple yet powerful logger system. 
 
