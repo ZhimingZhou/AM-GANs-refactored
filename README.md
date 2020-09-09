@@ -1,6 +1,6 @@
 # AM-GAN
 
-This is a clean implementation of **["Activation Maximization Generative Adversarial Nets"](https://arxiv.org/abs/1703.02000)**. 
+This is a clean implementation of ["Activation Maximization Generative Adversarial Nets"](https://arxiv.org/abs/1703.02000). 
 
 It was written with tensorflow-1.5 and python3.5. 
 
